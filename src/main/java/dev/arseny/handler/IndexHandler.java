@@ -38,14 +38,23 @@ public class IndexHandler implements RequestHandler<SQSEvent, APIGatewayProxyRes
             requests.add(RequestUtils.parseIndexRequest(record.getBody()));
         }
 
+        indexDocuments(requests);
+
+        return new APIGatewayProxyResponseEvent().withStatusCode(200);
+    }
+
+    private void indexDocuments(List<IndexRequest> requests) {
+
         Map<String, IndexWriter> writerMap = new HashMap<>();
 
         for (IndexRequest request : requests) {
+
+            // Get writer for the index
             IndexWriter writer;
             if (writerMap.containsKey(request.getIndexName())) {
                 writer = writerMap.get(request.getIndexName());
             } else {
-                writer = indexWriterService.getIndexWriter(request.getIndexName());
+                writer = indexWriterService.getIndexWriter(request);
                 writerMap.put(request.getIndexName(), writer);
             }
 
@@ -66,6 +75,10 @@ public class IndexHandler implements RequestHandler<SQSEvent, APIGatewayProxyRes
             }
         }
 
+        commitChanges(writerMap);
+    }
+
+    private void commitChanges(Map<String, IndexWriter> writerMap) {
         for (IndexWriter writer : writerMap.values()) {
             try {
                 writer.commit();
@@ -74,7 +87,5 @@ public class IndexHandler implements RequestHandler<SQSEvent, APIGatewayProxyRes
                 LOG.error(e);
             }
         }
-
-        return new APIGatewayProxyResponseEvent().withStatusCode(200);
     }
 }
